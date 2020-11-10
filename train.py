@@ -19,6 +19,7 @@ import archs
 import losses
 from dataset import Dataset
 from metrics import iou_score
+from metrics import dice_coef
 from utils import AverageMeter, str2bool
 
 ARCH_NAMES = archs.__all__
@@ -103,7 +104,8 @@ def parse_args():
 
 def train(config, train_loader, model, criterion, optimizer):
     avg_meters = {'loss': AverageMeter(),
-                  'iou': AverageMeter()}
+                  'iou': AverageMeter(),
+                  'dice': AverageMeter()}
 
     model.train()
 
@@ -120,10 +122,12 @@ def train(config, train_loader, model, criterion, optimizer):
                 loss += criterion(output, target)
             loss /= len(outputs)
             iou = iou_score(outputs[-1], target)
+            dice = dice_coef(outputs[-1], target)
         else:
             output = model(input)
             loss = criterion(output, target)
             iou = iou_score(output, target)
+            dice = dice_coef(output, target)
 
         # compute gradient and do optimizing step
         optimizer.zero_grad()
@@ -132,22 +136,26 @@ def train(config, train_loader, model, criterion, optimizer):
 
         avg_meters['loss'].update(loss.item(), input.size(0))
         avg_meters['iou'].update(iou, input.size(0))
+        avg_meters['dice'].update(dice, input.size(0))
 
         postfix = OrderedDict([
             ('loss', avg_meters['loss'].avg),
             ('iou', avg_meters['iou'].avg),
+            ('dice', avg_meters['dice'].avg),
         ])
         pbar.set_postfix(postfix)
         pbar.update(1)
     pbar.close()
 
     return OrderedDict([('loss', avg_meters['loss'].avg),
-                        ('iou', avg_meters['iou'].avg)])
+                        ('iou', avg_meters['iou'].avg),
+                        ('dice', avg_meters['dice'].avg)])
 
 
 def validate(config, val_loader, model, criterion):
     avg_meters = {'loss': AverageMeter(),
-                  'iou': AverageMeter()}
+                  'iou': AverageMeter(),
+                  'dice': AverageMeter(),}
 
     # switch to evaluate mode
     model.eval()
@@ -166,24 +174,29 @@ def validate(config, val_loader, model, criterion):
                     loss += criterion(output, target)
                 loss /= len(outputs)
                 iou = iou_score(outputs[-1], target)
+                dice = dice_coef(outputs[-1], target)
             else:
                 output = model(input)
                 loss = criterion(output, target)
                 iou = iou_score(output, target)
+                dice = dice_coef(output, target)
 
             avg_meters['loss'].update(loss.item(), input.size(0))
             avg_meters['iou'].update(iou, input.size(0))
+            avg_meters['dice'].update(dice, input.size(0))
 
             postfix = OrderedDict([
                 ('loss', avg_meters['loss'].avg),
                 ('iou', avg_meters['iou'].avg),
+                ('dice', avg_meters['dice'].avg)
             ])
             pbar.set_postfix(postfix)
             pbar.update(1)
         pbar.close()
 
     return OrderedDict([('loss', avg_meters['loss'].avg),
-                        ('iou', avg_meters['iou'].avg)])
+                        ('iou', avg_meters['iou'].avg),
+                        ('dice', avg_meters['dice'].avg)])
 
 
 def main():
@@ -249,7 +262,7 @@ def main():
     img_ids = [os.path.splitext(os.path.basename(p))[0] for p in img_ids]
 
     #train_img_ids, val_img_ids = train_test_split(img_ids, test_size=0.2, random_state=41)
-    val_idx = [4, 5]
+    val_idx = [0, 1]
     val_img_ids = []
     train_img_ids = []
 
@@ -331,10 +344,12 @@ def main():
         ('iou', []),
         ('val_loss', []),
         ('val_iou', []),
+        ('dice', []),
     ])
 
     best_iou = 0
     trigger = 0
+    best_dice = 0
     for epoch in range(config['epochs']):
         print('Epoch [%d/%d]' % (epoch, config['epochs']))
 
@@ -357,16 +372,24 @@ def main():
         log['iou'].append(train_log['iou'])
         log['val_loss'].append(val_log['loss'])
         log['val_iou'].append(val_log['iou'])
+        log['dice'].append(val_log['dice'])
 
         pd.DataFrame(log).to_csv('models/%s/log.csv' %
                                  config['name'], index=False)
 
         trigger += 1
-
+        '''
         if val_log['iou'] > best_iou:
             torch.save(model.state_dict(), 'models/%s/model.pth' %
                        config['name'])
             best_iou = val_log['iou']
+            print("=> saved best model")
+            trigger = 0
+        '''
+        if val_log['dice'] > best_dice:
+            torch.save(model.state_dict(), 'models/%s/model.pth' %
+                       config['name'])
+            best_dice = val_log['dice']
             print("=> saved best model")
             trigger = 0
 
