@@ -189,6 +189,7 @@ def validate(config, val_loader, model, criterion):
 def main():
     config = vars(parse_args())
 
+    print('config of dataset is ' + str(config['dataset']))
     if config['name'] is None:
         if config['deep_supervision']:
             config['name'] = '%s_%s_wDS' % (config['dataset'], config['arch'])
@@ -247,9 +248,19 @@ def main():
     img_ids = glob(os.path.join('inputs', config['dataset'], 'images', '*' + config['img_ext']))
     img_ids = [os.path.splitext(os.path.basename(p))[0] for p in img_ids]
 
-    train_img_ids, val_img_ids = train_test_split(img_ids, test_size=0.2, random_state=41)
+    #train_img_ids, val_img_ids = train_test_split(img_ids, test_size=0.2, random_state=41)
+    val_idx = [4, 5]
+    val_img_ids = []
+    train_img_ids = []
 
-    train_transform = Compose([
+    for image in img_ids:
+        im_begin = image.split('.')[0]
+        if int(im_begin[-1]) in val_idx:
+            val_img_ids.append(image)
+        else:
+            train_img_ids.append(image)
+
+    '''train_transform = Compose([
         transforms.RandomRotate90(),
         transforms.Flip(),
         OneOf([
@@ -265,7 +276,24 @@ def main():
         transforms.Resize(config['input_h'], config['input_w']),
         transforms.Normalize(),
     ])
+    '''
+    train_transform = Compose([
+        #transforms.RandomRotate90(),
+        #transforms.Flip(),
+        #OneOf([
+        #    transforms.HueSaturationValue(),
+        #    transforms.RandomBrightness(),
+        #    transforms.RandomContrast(),
+        #], p=1),
+        transforms.Resize(config['input_h'], config['input_w']),
+        transforms.Normalize(),
+    ])
 
+    val_transform = Compose([
+        transforms.Resize(config['input_h'], config['input_w']),
+        transforms.Normalize(),
+    ])
+    
     train_dataset = Dataset(
         img_ids=train_img_ids,
         img_dir=os.path.join('inputs', config['dataset'], 'images'),
