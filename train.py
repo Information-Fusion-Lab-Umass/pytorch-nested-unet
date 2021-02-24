@@ -17,7 +17,7 @@ from tqdm import tqdm
 
 import archs
 import losses
-from dataset import Dataset
+from myDataset import Dataset
 from metrics import iou_score
 from metrics import dice_coef
 from utils import AverageMeter, str2bool
@@ -25,7 +25,6 @@ from utils import AverageMeter, str2bool
 ARCH_NAMES = archs.__all__
 LOSS_NAMES = losses.__all__
 LOSS_NAMES.append('BCEWithLogitsLoss')
-
 
 def parse_args():
     parser = argparse.ArgumentParser()
@@ -63,6 +62,8 @@ def parse_args():
     # dataset
     parser.add_argument('--dataset', default='dsb2018_96',
                         help='dataset name')
+    parser.add_argument('--dataset2', default='dsb2018_96',
+                        help='second view dataset')
     parser.add_argument('--img_ext', default='.png',
                         help='image file extension')
     parser.add_argument('--mask_ext', default='.png',
@@ -110,33 +111,35 @@ def train(config, train_loader, model, criterion, optimizer):
     model.train()
 
     pbar = tqdm(total=len(train_loader))
-    for input, target, _ in train_loader:
-        input = input.cuda()
-        target = target.cuda()
+    for input1, input2, target1, target2, _ in train_loader:
+        input1 = input1.cuda()
+        input2 = input2.cuda()
+        target1 = target1.cuda()
+        target2 = target2.cuda()    
 
         # compute output
         if config['deep_supervision']:
-            outputs = model(input)
+            outputs = model(input1, input2)
             loss = 0
             for output in outputs:
-                loss += criterion(output, target)
+                loss += criterion(output, target1)
             loss /= len(outputs)
-            iou = iou_score(outputs[-1], target)
-            dice = dice_coef(outputs[-1], target)
+            iou = iou_score(outputs[-1], target1)
+            dice = dice_coef(outputs[-1], target1)
         else:
-            output = model(input)
-            loss = criterion(output, target)
-            iou = iou_score(output, target)
-            dice = dice_coef(output, target)
+            output = model(input1, input2)
+            loss = criterion(output, target1)
+            iou = iou_score(output, target1)
+            dice = dice_coef(output, target1)
 
         # compute gradient and do optimizing step
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
 
-        avg_meters['loss'].update(loss.item(), input.size(0))
-        avg_meters['iou'].update(iou, input.size(0))
-        avg_meters['dice'].update(dice, input.size(0))
+        avg_meters['loss'].update(loss.item(), input1.size(0))
+        avg_meters['iou'].update(iou, input1.size(0))
+        avg_meters['dice'].update(dice, input1.size(0))
 
         postfix = OrderedDict([
             ('loss', avg_meters['loss'].avg),
@@ -162,24 +165,28 @@ def validate(config, val_loader, model, criterion):
 
     with torch.no_grad():
         pbar = tqdm(total=len(val_loader))
-        for input, target, _ in val_loader:
-            input = input.cuda()
-            target = target.cuda()
+        for input1, input2, target1, target2, _ in val_loader:
+            input1 = input1.cuda()
+            input2 = input2.cuda()
+            print(type(input1))
+            print(type(input2))
+            target1 = target1.cuda()
+            target2 = target2.cuda()
 
             # compute output
             if config['deep_supervision']:
-                outputs = model(input)
+                outputs = model(input1, input2)
                 loss = 0
                 for output in outputs:
-                    loss += criterion(output, target)
+                    loss += criterion(output, target1)
                 loss /= len(outputs)
-                iou = iou_score(outputs[-1], target)
-                dice = dice_coef(outputs[-1], target)
+                iou = iou_score(outputs[-1], target1)
+                dice = dice_coef(outputs[-1], target1)
             else:
-                output = model(input)
-                loss = criterion(output, target)
-                iou = iou_score(output, target)
-                dice = dice_coef(output, target)
+                output = model(input1, input2)
+                loss = criterion(output, target1)
+                iou = iou_score(output, target1)
+                dice = dice_coef(output, target1)
 
             avg_meters['loss'].update(loss.item(), input.size(0))
             avg_meters['iou'].update(iou, input.size(0))
@@ -273,31 +280,7 @@ def main():
         else:
             train_img_ids.append(image)
 
-    '''train_transform = Compose([
-        transforms.RandomRotate90(),
-        transforms.Flip(),
-        OneOf([
-            transforms.HueSaturationValue(),
-            transforms.RandomBrightness(),
-            transforms.RandomContrast(),
-        ], p=1),
-        transforms.Resize(config['input_h'], config['input_w']),
-        transforms.Normalize(),
-    ])
-
-    val_transform = Compose([
-        transforms.Resize(config['input_h'], config['input_w']),
-        transforms.Normalize(),
-    ])
-    '''
     train_transform = Compose([
-        #transforms.RandomRotate90(),
-        #transforms.Flip(),
-        #OneOf([
-        #    transforms.HueSaturationValue(),
-        #    transforms.RandomBrightness(),
-        #    transforms.RandomContrast(),
-        #], p=1),
         transforms.Resize(config['input_h'], config['input_w']),
         transforms.Normalize(),
     ])
@@ -314,7 +297,10 @@ def main():
         img_ext=config['img_ext'],
         mask_ext=config['mask_ext'],
         num_classes=config['num_classes'],
-        transform=train_transform)
+        img_dir_view2=os.path.join('inputs', config['dataset2'], 'images'),
+        mask_dir_view2=os.path.join('inputs', config['dataset2'], 'masks'),
+        #transform=train_transform,
+)
     val_dataset = Dataset(
         img_ids=val_img_ids,
         img_dir=os.path.join('inputs', config['dataset'], 'images'),
@@ -322,7 +308,10 @@ def main():
         img_ext=config['img_ext'],
         mask_ext=config['mask_ext'],
         num_classes=config['num_classes'],
-        transform=val_transform)
+        img_dir_view2=os.path.join('inputs', config['dataset2'], 'images'),
+        mask_dir_view2=os.path.join('inputs', config['dataset2'], 'masks'),
+        #transform=val_transform,
+)
 
     train_loader = torch.utils.data.DataLoader(
         train_dataset,
