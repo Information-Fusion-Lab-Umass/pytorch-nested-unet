@@ -167,6 +167,8 @@ class MultiViewNestedUNet(nn.Module):
 
         self.conv0_4 = VGGBlock(nb_filter[0]*4+nb_filter[1], nb_filter[0], nb_filter[0])
 
+        self.conv_combine = VGGBlock(nb_filter[4] * 2, nb_filter[4], nb_filter[4])
+
         if self.deep_supervision:
             self.final1 = nn.Conv2d(nb_filter[0], num_classes, kernel_size=1)
             self.final2 = nn.Conv2d(nb_filter[0], num_classes, kernel_size=1)
@@ -214,13 +216,12 @@ class MultiViewNestedUNet(nn.Module):
         xmain_4_0 = self.conv4_0(self.pool(xmain_3_0))
 
         xcomb = torch.cat([x4_0, xmain_4_0], 1)
-        print("xcomb size is ", xcomb.size())
         batchSize = xcomb.size()[0]
-        xcomb = xcomb.view(batchSize, -1)
-        print("xcomb size after view change is ", xcomb.size())
-        xcomb = self.fcnet(xcomb)
-        xcomb = xcomb.view(batchSize, 512,6, 6)
-
+        for i in range(batchSize):
+            xcomb[i] = torch.cat([x4_0[i], xmain_4_0[i]])
+           
+        xcomb = self.conv_combine(xcomb)
+   
         xmain_3_1 = self.conv3_1(torch.cat([xmain_3_0, self.up(xcomb)], 1))
         xmain_2_2 = self.conv2_2(torch.cat([xmain_2_0, xmain_2_1, self.up(xmain_3_1)], 1))
         xmain_1_3 = self.conv1_3(torch.cat([xmain_1_0, xmain_1_1, xmain_1_2, self.up(xmain_2_2)], 1))
