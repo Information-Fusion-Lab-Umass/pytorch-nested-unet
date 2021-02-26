@@ -26,6 +26,8 @@ ARCH_NAMES = archs.__all__
 LOSS_NAMES = losses.__all__
 LOSS_NAMES.append('BCEWithLogitsLoss')
 
+pretrained_model = None
+
 def parse_args():
     parser = argparse.ArgumentParser()
 
@@ -68,6 +70,10 @@ def parse_args():
                         help='image file extension')
     parser.add_argument('--mask_ext', default='.png',
                         help='mask file extension')
+
+    # model for second view
+    parser.add_argument('--secondViewPath', default='models/fullAxis_1val_batch_0_1_test_2_val/model.pth',
+                        help='second views pretrained models file path')
 
     # optimizer
     parser.add_argument('--optimizer', default='SGD',
@@ -114,8 +120,11 @@ def train(config, train_loader, model, criterion, optimizer):
     for input1, input2, target1, target2, _ in train_loader:
         input1 = input1.cuda()
         input2 = input2.cuda()
+   
+        #pretrained_model = torch.load(modelFile)
+        _, embeddings = pretrained_model(input2)         
+
         target1 = target1.cuda()
-        target2 = target2.cuda()    
 
         # compute output
         if config['deep_supervision']:
@@ -127,7 +136,7 @@ def train(config, train_loader, model, criterion, optimizer):
             iou = iou_score(outputs[-1], target1)
             dice = dice_coef(outputs[-1], target1)
         else:
-            output = model(input1, input2)
+            output = model(input1, embeddings)
             loss = criterion(output, target1)
             iou = iou_score(output, target1)
             dice = dice_coef(output, target1)
@@ -168,11 +177,9 @@ def validate(config, val_loader, model, criterion):
         for input1, input2, target1, target2, _ in val_loader:
             input1 = input1.cuda()
             input2 = input2.cuda()
-            print(type(input1))
-            print(type(input2))
             target1 = target1.cuda()
-            target2 = target2.cuda()
 
+            _, embeddings = pretrained_model(input2)         
             # compute output
             if config['deep_supervision']:
                 outputs = model(input1, input2)
@@ -183,14 +190,14 @@ def validate(config, val_loader, model, criterion):
                 iou = iou_score(outputs[-1], target1)
                 dice = dice_coef(outputs[-1], target1)
             else:
-                output = model(input1, input2)
+                output = model(input1, embeddings)
                 loss = criterion(output, target1)
                 iou = iou_score(output, target1)
                 dice = dice_coef(output, target1)
 
-            avg_meters['loss'].update(loss.item(), input.size(0))
-            avg_meters['iou'].update(iou, input.size(0))
-            avg_meters['dice'].update(dice, input.size(0))
+            avg_meters['loss'].update(loss.item(), input1.size(0))
+            avg_meters['iou'].update(iou, input1.size(0))
+            avg_meters['dice'].update(dice, input1.size(0))
 
             postfix = OrderedDict([
                 ('loss', avg_meters['loss'].avg),
@@ -266,7 +273,10 @@ def main():
 
     # Data loading code
     img_ids = glob(os.path.join('inputs', config['dataset'], 'images', '*' + config['img_ext']))
+    #print("image ids previous   ", img_ids)
     img_ids = [os.path.splitext(os.path.basename(p))[0] for p in img_ids]
+
+    #print("image ids is   ", img_ids)
 
     #train_img_ids, val_img_ids = train_test_split(img_ids, test_size=0.2, random_state=41)
     val_idx = [0, 1]
@@ -339,6 +349,17 @@ def main():
     best_iou = 0
     trigger = 0
     best_dice = 0
+
+    # Pretrained model loading code
+    modelFile = config['secondViewPath']
+    global pretrained_model
+    pretrained_model = archs.__dict__['NestedUNetEmbedReturn'](config['num_classes'],
+                                                               config['input_channels'],
+                                                               config['deep_supervision'])
+    pretrained_model.load_state_dict(torch.load(modelFile))
+    pretrained_model = pretrained_model.cuda()
+    pretrained_model.eval()
+    
     for epoch in range(config['epochs']):
         print('Epoch [%d/%d]' % (epoch, config['epochs']))
 
