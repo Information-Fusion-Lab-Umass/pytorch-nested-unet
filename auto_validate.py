@@ -18,7 +18,7 @@ from tqdm import tqdm
 
 import archs
 import losses
-from dataset import Dataset
+from myDataset import Dataset
 from metrics import iou_score
 from metrics import dice_coef
 from utils import AverageMeter, str2bool
@@ -27,8 +27,7 @@ ARCH_NAMES = archs.__all__
 LOSS_NAMES = losses.__all__
 LOSS_NAMES.append('BCEWithLogitsLoss')
 
-
-
+pretrained_model = None
 
 def parse_args():
     parser = argparse.ArgumentParser()
@@ -66,10 +65,16 @@ def parse_args():
     # dataset
     parser.add_argument('--dataset', default='dsb2018_96',
                         help='dataset name')
+    parser.add_argument('--dataset2', default='dsb2018_96',
+                        help='second view dataset name')
     parser.add_argument('--img_ext', default='.png',
                         help='image file extension')
     parser.add_argument('--mask_ext', default='.png',
                         help='mask file extension')
+
+    # model for second view
+    parser.add_argument('--secondViewPath', default='/models/fullAxis_1val_batch_0_1_test_2_val/model.pth',
+                        help='second views pretrained models file path')
 
     # optimizer
     parser.add_argument('--optimizer', default='SGD',
@@ -114,33 +119,37 @@ def train(config, train_loader, model, criterion, optimizer):
     pbar = tqdm(total=len(train_loader))
     #print("length of dataloader from inside the function is " + str(len(train_loader)))
     #print(train_loader)
-    for input, target, _ in train_loader:
-        input = input.cuda()
-        target = target.cuda()
+    for input1, input2, target1, target2, _ in train_loader:
+        input1 = input1.cuda()
+        input2 = input2.cuda()
+
+        _, embeddings = pretrained_model(input2)  
+
+        target1 = target1.cuda()
 
         # compute output
         if config['deep_supervision']:
-            outputs = model(input)
+            outputs = model(input1, embeddings)
             loss = 0
             for output in outputs:
-                loss += criterion(output, target)
+                loss += criterion(output, target1)
             loss /= len(outputs)
-            iou = iou_score(outputs[-1], target)
-            dice = dice_coef(outputs[-1], target)
+            iou = iou_score(outputs[-1], target1)
+            dice = dice_coef(outputs[-1], target1)
         else:
-            output = model(input)
-            loss = criterion(output, target)
-            iou = iou_score(output, target)
-            dice = dice_coef(output, target)
+            output = model(input1, embeddings)
+            loss = criterion(output, target1)
+            iou = iou_score(output, target1)
+            dice = dice_coef(output, target1)
 
         # compute gradient and do optimizing step
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
 
-        avg_meters['loss'].update(loss.item(), input.size(0))
-        avg_meters['iou'].update(iou, input.size(0))
-        avg_meters['dice'].update(dice, input.size(0))
+        avg_meters['loss'].update(loss.item(), input1.size(0))
+        avg_meters['iou'].update(iou, input1.size(0))
+        avg_meters['dice'].update(dice, input1.size(0))
 
         postfix = OrderedDict([
             ('loss', avg_meters['loss'].avg),
@@ -166,28 +175,30 @@ def validate(config, val_loader, model, criterion):
 
     with torch.no_grad():
         pbar = tqdm(total=len(val_loader))
-        for input, target, _ in val_loader:
-            input = input.cuda()
-            target = target.cuda()
+        for input1, input2, target1, target2, _ in val_loader:
+            input1 = input1.cuda()
+            input2 = input2.cuda()
+            target1 = target1.cuda()
 
+            _, embeddings = pretrained_model(input2)
             # compute output
             if config['deep_supervision']:
-                outputs = model(input)
+                outputs = model(input1, input2)
                 loss = 0
                 for output in outputs:
-                    loss += criterion(output, target)
+                    loss += criterion(output, target1)
                 loss /= len(outputs)
-                iou = iou_score(outputs[-1], target)
-                dice = dice_coef(outputs[-1], target)
+                iou = iou_score(outputs[-1], target1)
+                dice = dice_coef(outputs[-1], target1)
             else:
-                output = model(input)
-                loss = criterion(output, target)
-                iou = iou_score(output, target)
-                dice = dice_coef(output, target)
+                output = model(input1, embeddings)
+                loss = criterion(output, target1)
+                iou = iou_score(output, target1)
+                dice = dice_coef(output, target1)
 
-            avg_meters['loss'].update(loss.item(), input.size(0))
-            avg_meters['iou'].update(iou, input.size(0))
-            avg_meters['dice'].update(dice, input.size(0))
+            avg_meters['loss'].update(loss.item(), input1.size(0))
+            avg_meters['iou'].update(iou, input1.size(0))
+            avg_meters['dice'].update(dice, input1.size(0))
 
             postfix = OrderedDict([
                 ('loss', avg_meters['loss'].avg),
@@ -204,6 +215,7 @@ def validate(config, val_loader, model, criterion):
 
 def main_func(train_idx, val_set, test_set, modelName, fileName):
     config = vars(parse_args())
+    
     config['name'] = modelName
     fw = open('batch_results_train/'+ fileName, 'w')
     print('config of dataset is ' + str(config['dataset']))
@@ -338,7 +350,10 @@ def main_func(train_idx, val_set, test_set, modelName, fileName):
         img_ext=config['img_ext'],
         mask_ext=config['mask_ext'],
         num_classes=config['num_classes'],
-        transform=train_transform2)
+        img_dir_view2=os.path.join('inputs', config['dataset2'], 'images'),
+        mask_dir_view2=os.path.join('inputs', config['dataset2'], 'masks'),
+        #transform=train_transform
+)
     val_dataset = Dataset(
         img_ids=val_img_ids,
         img_dir=os.path.join('inputs', config['dataset'], 'images'),
@@ -346,7 +361,10 @@ def main_func(train_idx, val_set, test_set, modelName, fileName):
         img_ext=config['img_ext'],
         mask_ext=config['mask_ext'],
         num_classes=config['num_classes'],
-        transform=val_transform)
+        img_dir_view2=os.path.join('inputs', config['dataset2'], 'images'),
+        mask_dir_view2=os.path.join('inputs', config['dataset2'], 'masks'),      
+        #transform=val_transform
+)
 
     #print("length of train dataset is " + str(len(train_dataset)))
     #print("length of val dataset is " + str(len(val_dataset)))
@@ -489,7 +507,10 @@ def perform_validation(modelName, testNum, fileName):
         img_ext=config['img_ext'],
         mask_ext=config['mask_ext'],
         num_classes=config['num_classes'],
-        transform=val_transform)
+        img_dir_view2=os.path.join('inputs', config['dataset2'], 'images'),
+        mask_dir_view2=os.path.join('inputs', config['dataset2'], 'masks'),
+        #transform=val_transform
+)
     val_loader = torch.utils.data.DataLoader(
         val_dataset,
         batch_size=config['batch_size'],
@@ -504,21 +525,24 @@ def perform_validation(modelName, testNum, fileName):
     for c in range(config['num_classes']):
         os.makedirs(os.path.join('outputs', config['name'], str(c)), exist_ok=True)
     with torch.no_grad():
-        for input, target, meta in tqdm(val_loader, total=len(val_loader)):
-            input = input.cuda()
-            target = target.cuda()
+        for input1, input2, target1, target2 , meta in tqdm(val_loader, total=len(val_loader)):
+            input1 = input1.cuda()
+            input2 = input2.cuda()
+            target1 = target1.cuda()
 
+            _, embeddings = pretrained_model(input2)
+           
             # compute output
             if config['deep_supervision']:
-                output = model(input)[-1]
+                output = model(input1, embeddings)[-1]
             else:
-                output = model(input)
+                output = model(input1, embeddings)
 
-            iou = iou_score(output, target)
-            avg_meter.update(iou, input.size(0))
+            iou = iou_score(output, target1)
+            avg_meter.update(iou, input1.size(0))
 
-            dice = dice_coef(output, target)
-            dice_avg_meter.update(dice, input.size(0))
+            dice = dice_coef(output, target1)
+            dice_avg_meter.update(dice, input1.size(0))
 
             output = torch.sigmoid(output).cpu().numpy()
 
@@ -564,6 +588,17 @@ def main():
     params['gamma'] = 0.66666
     '''
     #params = vars(parse_args())
+    config = vars(parse_args())
+
+    modelFile = config['secondViewPath']
+    global pretrained_model
+    pretrained_model = archs.__dict__['NestedUNetEmbedReturn'](config['num_classes'], 
+                                                               config['input_channels'], 
+                                                               config['deep_supervision'])
+    pretrained_model.load_state_dict(torch.load(modelFile))
+    pretrained_model = pretrained_model.cuda()
+    pretrained_model.eval()
+
     for i in range(0, 8, 2):
         for j in range(0, 8, 1):
             if j == i or j == i + 1:
@@ -574,9 +609,9 @@ def main():
                     continue
                 use.append(k)
             #print(use[0] + use[1] + use[2] + use[3])
-            modelName = 'shortAxis_1val_batch_' + str(i) + '_' + str(i + 1) + '_test_' + str(j) + '_val'
-            trainFileName = 'shortAxis_1val_batch_' + str(i) + '_' + str(i + 1) + '_test_' + str(j) + '_val_' + '_trainingResult'
-            valFileName = 'shortAxis_1val_batch_' + str(i) + '_' + str(i + 1) + '_test_' + str(j) + '_val_' + '_validationResult'
+            modelName = 'mView_axialCropped_fa_1val_batch_' + str(i) + '_' + str(i + 1) + '_test_' + str(j) + '_val'
+            trainFileName = 'mView_axialCropped_fa_1val_batch_' + str(i) + '_' + str(i + 1) + '_test_' + str(j) + '_val_' + '_trainingResult'
+            valFileName = 'mView_axialCropped_fa_1val_batch_' + str(i) + '_' + str(i + 1) + '_test_' + str(j) + '_val_' + '_validationResult'
             main_func(use, j, i, modelName, trainFileName)
             perform_validation(modelName, i, valFileName)
 

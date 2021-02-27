@@ -128,7 +128,7 @@ def train(config, train_loader, model, criterion, optimizer):
 
         # compute output
         if config['deep_supervision']:
-            outputs = model(input1, input2)
+            outputs = model(input1, embeddings)
             loss = 0
             for output in outputs:
                 loss += criterion(output, target1)
