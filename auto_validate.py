@@ -123,13 +123,11 @@ def train(config, train_loader, model, criterion, optimizer):
     model.train()
 
     pbar = tqdm(total=len(train_loader))
-    #print("length of dataloader from inside the function is " + str(len(train_loader)))
-    #print(train_loader)
+    
     for input1, input2, target1, target2, _ in train_loader:
         input1 = input1.cuda()
         input2 = input2.cuda()
-
-        #print("pretrained model is  ", pretrained_model)
+        
         _, embeddings = pretrained_model(input2)  
 
         target1 = target1.cuda()
@@ -232,8 +230,7 @@ def main_func(train_idx, val_set, test_set, modelName, fileName, secondModel):
     pretrained_model = pretrained_model.cuda()
     pretrained_model.eval()   
     
-    config['name'] = modelName
-    #fw = open('batch_results_train/'+ fileName, 'w')
+    config['name'] = modelName    
     if not os.path.exists(config['trainResultsDir']):
         os.mkdir(config['trainResultsDir'])
     fw = open(config['trainResultsDir'] + fileName, 'w')
@@ -254,8 +251,7 @@ def main_func(train_idx, val_set, test_set, modelName, fileName, secondModel):
         fw.write('%s: %s' % (key, config[key]) + '\n')
     print('-' * 20)
     fw.write('-' * 20 + '\n')
-    #TODO print parameters manually i think, all imports to function
-
+    
     with open('models/%s/config.yml' % config['name'], 'w') as f:
         yaml.dump(config, f)
 
@@ -315,25 +311,7 @@ def main_func(train_idx, val_set, test_set, modelName, fileName, secondModel):
             val_img_ids.append(image)
         elif int(im_begin[-1]) in train_idx:
             train_img_ids.append(image)
-    #print("train img ids size is " + str(len(train_img_ids)))
-
-    '''train_transform = Compose([
-        transforms.RandomRotate90(),
-        transforms.Flip(),
-        OneOf([
-            transforms.HueSaturationValue(),
-            transforms.RandomBrightness(),
-            transforms.RandomContrast(),
-        ], p=1),
-        transforms.Resize(config['input_h'], config['input_w']),
-        transforms.Normalize(),
-    ])
-
-    val_transform = Compose([
-        transforms.Resize(config['input_h'], config['input_w']),
-        transforms.Normalize(),
-    ])
-    '''
+        
     train_transform = Compose([
         transforms.Resize(config['input_h'], config['input_w']),
         transforms.Normalize(),
@@ -377,9 +355,6 @@ def main_func(train_idx, val_set, test_set, modelName, fileName, secondModel):
         mask_dir_view2=os.path.join('inputs', config['dataset2'], 'masks'),      
         #transform=val_transform
 )
-
-    #print("length of train dataset is " + str(len(train_dataset)))
-    #print("length of val dataset is " + str(len(val_dataset)))
 
     train_loader = torch.utils.data.DataLoader(
         train_dataset,
@@ -466,10 +441,7 @@ def perform_validation(modelName, testNum, fileName, secondModel):
     args = vars(parse_args())
     
     global pretrained_model
-    pretrained_model = None
-    #pretrained_model = archs.__dict__['NestedUNetEmbedReturn'](config['num_classes'], 
-    #                                                           config['input_channels'], 
-    #                                                           config['deep_supervision'])
+    pretrained_model = None    
     pretrained_model = archs.__dict__['NestedUNetEmbedReturn'](args['num_classes'], 
                                                                args['input_channels'], 
                                                                args['deep_supervision'])
@@ -479,14 +451,11 @@ def perform_validation(modelName, testNum, fileName, secondModel):
 
     if not os.path.exists(config['testResultsDir']):
         os.mkdir(config['testResultsDir'])
-    #fw = open('batch_results_val/' + fileName, 'w') 
-    fw = open(args['testResultsDir'] + fileName, 'w') 
-    #with open('models/%s/config.yml' % args.name, 'r') as f:
+
+    fw = open(args['testResultsDir'] + fileName, 'w')     
     with open('models/%s/config.yml' % modelName, 'r') as f:   
         config = yaml.load(f, Loader=yaml.FullLoader)
- 
-    #config['dataset'] = 'ax_crop_val_' + str(testNum) + '_' + str(testNum + 1)
-
+     
     print('-'*20)
     fw.write('-'*20 + '\n')
     for key in config.keys():
@@ -585,9 +554,6 @@ def perform_validation(modelName, testNum, fileName, secondModel):
     torch.cuda.empty_cache()
 
 def main():
-    #params = vars(parse_args())
-    #config = vars(parse_args())
-
     #modelFile = config['secondViewPath']
     global pretrained_model
     #pretrained_model = archs.__dict__['NestedUNetEmbedReturn'](config['num_classes'], 
@@ -606,7 +572,6 @@ def main():
                 if k == i or k == j or k == i + 1:
                     continue
                 use.append(k)
-            #print(use[0] + use[1] + use[2] + use[3])
             secondModelName = 'fullAxis_1val_batch_' + str(i) + '_' + str(i + 1) + '_test_' + str(j) + '_val'
             modelName = 'mView_sameSetTrain_axialCropped_fullAxis_1val_batch_' + str(i) + '_' + str(i + 1) + '_test_' + str(j) + '_val'
             trainFileName = 'mView_sameSetTrain_axialCropped_fullAxis_1val_batch_' + str(i) + '_' + str(i + 1) + '_test_' + str(j) + '_val_' + '_trainingResult'

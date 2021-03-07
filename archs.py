@@ -266,26 +266,11 @@ class MultiViewNestedUNet(nn.Module):
 
         x4_0 = self.conv4_0(self.pool(x3_0))
      
-        #print("x4_0 size is ", x4_0.size())
-        #print("input2 size is   ", input2.size())
-
         xcomb = torch.cat([x4_0, input2], 1)
-        #print("xcomb size is  ", xcomb.size())
-        #batchSize = xcomb.size()[0]
-        #for i in range(batchSize):
-        #    xcomb[i] = torch.cat([x4_0[i], input2])
-   
         #xcomb[::2, :] = x4_0
         #xcomb[1::2, :] = xmain_4_0
         #print("xcomb size is ", xcomb.size())        
         xcomb = self.conv_combine(xcomb)
-        #batchSize = xcomb.size()[0]
-        #xcomb = xcomb.view(batchSize, -1)
-        #print("xcomb size after view change is ", xcomb.size())
-        #xcomb = self.fcnet(xcomb)
-        #xcomb = xcomb.view(batchSize, 512,6, 6)
-
-        #x3_1 = self.conv3_1(torch.cat([x3_0, self.up(x4_0)], 1))
         x3_1 = self.conv3_1(torch.cat([x3_0, self.up(xcomb)], 1))
         x2_2 = self.conv2_2(torch.cat([x2_0, x2_1, self.up(x3_1)], 1))
         x1_3 = self.conv1_3(torch.cat([x1_0, x1_1, x1_2, self.up(x2_2)], 1))
