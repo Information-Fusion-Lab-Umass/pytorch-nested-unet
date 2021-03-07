@@ -27,7 +27,7 @@ ARCH_NAMES = archs.__all__
 LOSS_NAMES = losses.__all__
 LOSS_NAMES.append('BCEWithLogitsLoss')
 
-pretrained_model = None
+#pretrained_model = None
 
 def parse_args():
     parser = argparse.ArgumentParser()
@@ -76,6 +76,12 @@ def parse_args():
     parser.add_argument('--secondViewPath', default='/models/fullAxis_1val_batch_0_1_test_2_val/model.pth',
                         help='second views pretrained models file path')
 
+    # val and test results folder
+    parser.add_argument('--trainResultsDir', default='multiViewResultTrain/',
+                        help='Cross Validation Training Results Directory')
+    parser.add_argument('--testResultsDir', default='multiViewResultTest/',
+                        help='Cross Validation Test Results Directory')
+
     # optimizer
     parser.add_argument('--optimizer', default='SGD',
                         choices=['Adam', 'SGD'],
@@ -123,6 +129,7 @@ def train(config, train_loader, model, criterion, optimizer):
         input1 = input1.cuda()
         input2 = input2.cuda()
 
+        #print("pretrained model is  ", pretrained_model)
         _, embeddings = pretrained_model(input2)  
 
         target1 = target1.cuda()
@@ -213,11 +220,24 @@ def validate(config, val_loader, model, criterion):
                         ('iou', avg_meters['iou'].avg),
                         ('dice', avg_meters['dice'].avg)])
 
-def main_func(train_idx, val_set, test_set, modelName, fileName):
+def main_func(train_idx, val_set, test_set, modelName, fileName, secondModel):
     config = vars(parse_args())
+ 
+    global pretrained_model   
+    pretrained_model = None
+    pretrained_model = archs.__dict__['NestedUNetEmbedReturn'](config['num_classes'], 
+                                                               config['input_channels'], 
+                                                               config['deep_supervision'])
+    pretrained_model.load_state_dict(torch.load('../fall2020/pytorch-nested-unet/models/' + secondModel + '/model.pth'))
+    pretrained_model = pretrained_model.cuda()
+    pretrained_model.eval()   
     
     config['name'] = modelName
-    fw = open('batch_results_train/'+ fileName, 'w')
+    #fw = open('batch_results_train/'+ fileName, 'w')
+    if not os.path.exists(config['trainResultsDir']):
+        os.mkdir(config['trainResultsDir'])
+    fw = open(config['trainResultsDir'] + fileName, 'w')
+
     print('config of dataset is ' + str(config['dataset']))
     fw.write('config of dataset is ' + str(config['dataset']) + '\n')    
     if config['name'] is None:
@@ -315,20 +335,12 @@ def main_func(train_idx, val_set, test_set, modelName, fileName):
     ])
     '''
     train_transform = Compose([
-        #transforms.RandomRotate90(),
-        #transforms.Flip(),
-        #OneOf([
-        #    transforms.HueSaturationValue(),
-        #    transforms.RandomBrightness(),
-        #    transforms.RandomContrast(),
-        #], p=1),
         transforms.Resize(config['input_h'], config['input_w']),
         transforms.Normalize(),
     ])
     train_transform2 = Compose([
         transforms.Resize(config['input_h'], config['input_w']),
         transforms.Normalize(),
-        #transforms.ShiftScaleRotate(shift_limit = 0.1, scale_limit = 0, rotate_limit = 0),# shift_limit_x = 0.1, shift_limit_y = 0.1, p = 1),
     ])
     
     val_transform2 = Compose([
@@ -450,10 +462,25 @@ def main_func(train_idx, val_set, test_set, modelName, fileName):
 
         torch.cuda.empty_cache()
 
-def perform_validation(modelName, testNum, fileName):
-    #args = parse_args()
+def perform_validation(modelName, testNum, fileName, secondModel):
+    args = vars(parse_args())
+    
+    global pretrained_model
+    pretrained_model = None
+    #pretrained_model = archs.__dict__['NestedUNetEmbedReturn'](config['num_classes'], 
+    #                                                           config['input_channels'], 
+    #                                                           config['deep_supervision'])
+    pretrained_model = archs.__dict__['NestedUNetEmbedReturn'](args['num_classes'], 
+                                                               args['input_channels'], 
+                                                               args['deep_supervision'])
+    pretrained_model.load_state_dict(torch.load('../fall2020/pytorch-nested-unet/models/' + secondModel + '/model.pth'))
+    pretrained_model = pretrained_model.cuda()
+    pretrained_model.eval()   
 
-    fw = open('batch_results_val/' + fileName, 'w') 
+    if not os.path.exists(config['testResultsDir']):
+        os.mkdir(config['testResultsDir'])
+    #fw = open('batch_results_val/' + fileName, 'w') 
+    fw = open(args['testResultsDir'] + fileName, 'w') 
     #with open('models/%s/config.yml' % args.name, 'r') as f:
     with open('models/%s/config.yml' % modelName, 'r') as f:   
         config = yaml.load(f, Loader=yaml.FullLoader)
@@ -518,7 +545,6 @@ def perform_validation(modelName, testNum, fileName):
         num_workers=config['num_workers'],
         drop_last=False)
 
-
     avg_meter = AverageMeter()
     dice_avg_meter = AverageMeter()
 
@@ -559,47 +585,19 @@ def perform_validation(modelName, testNum, fileName):
     torch.cuda.empty_cache()
 
 def main():
-    '''params = {}
-    params['dataset'] = 'sa_dataset'
-    params['loss'] = 'BCEDiceLoss'
-    params['arch'] = 'NestedUNet'
-    params['num_classes'] = 2
-    params['input_channels'] = 3
-    params['deep_supervision'] = False
-    params['optimizer'] = 'SGD'
-    params['lr'] = 1e-3
-    params['weight_decay'] = 1e-4
-    params['momentum'] = 0.9
-    params['nesterov'] = False
-    params['scheduler'] = 'CosineAnnealingLR'
-    params['img_ext'] = 'png'
-    params['mask_ext'] = 'png'
-    params['input_h'] = 96   ## can be set to a command line argument in the future
-    params['input_w'] = 96   ## can be set to a command line argument in the future
-    params['batch_size'] = 16
-    params['num_workers'] = 4
-    params['epochs'] = 100
-    params['early_stopping'] = -1
-    params['min_lr'] = 1e-5
-    # extras
-    params['factor'] = 0.1
-    params['patience'] = 2
-    params['milestones'] = '1,2'
-    params['gamma'] = 0.66666
-    '''
     #params = vars(parse_args())
-    config = vars(parse_args())
+    #config = vars(parse_args())
 
-    modelFile = config['secondViewPath']
+    #modelFile = config['secondViewPath']
     global pretrained_model
-    pretrained_model = archs.__dict__['NestedUNetEmbedReturn'](config['num_classes'], 
-                                                               config['input_channels'], 
-                                                               config['deep_supervision'])
-    pretrained_model.load_state_dict(torch.load(modelFile))
-    pretrained_model = pretrained_model.cuda()
-    pretrained_model.eval()
+    #pretrained_model = archs.__dict__['NestedUNetEmbedReturn'](config['num_classes'], 
+    #                                                           config['input_channels'], 
+    #                                                           config['deep_supervision'])
+    #pretrained_model.load_state_dict(torch.load(modelFile))
+    #pretrained_model = pretrained_model.cuda()
+    #pretrained_model.eval()
 
-    for i in range(0, 8, 2):
+    for i in range(6, 8, 2):
         for j in range(0, 8, 1):
             if j == i or j == i + 1:
                 continue
@@ -609,11 +607,12 @@ def main():
                     continue
                 use.append(k)
             #print(use[0] + use[1] + use[2] + use[3])
-            modelName = 'mView_axialCropped_fa_1val_batch_' + str(i) + '_' + str(i + 1) + '_test_' + str(j) + '_val'
-            trainFileName = 'mView_axialCropped_fa_1val_batch_' + str(i) + '_' + str(i + 1) + '_test_' + str(j) + '_val_' + '_trainingResult'
-            valFileName = 'mView_axialCropped_fa_1val_batch_' + str(i) + '_' + str(i + 1) + '_test_' + str(j) + '_val_' + '_validationResult'
-            main_func(use, j, i, modelName, trainFileName)
-            perform_validation(modelName, i, valFileName)
+            secondModelName = 'fullAxis_1val_batch_' + str(i) + '_' + str(i + 1) + '_test_' + str(j) + '_val'
+            modelName = 'mView_sameSetTrain_axialCropped_fullAxis_1val_batch_' + str(i) + '_' + str(i + 1) + '_test_' + str(j) + '_val'
+            trainFileName = 'mView_sameSetTrain_axialCropped_fullAxis_1val_batch_' + str(i) + '_' + str(i + 1) + '_test_' + str(j) + '_val_' + '_trainingResult'
+            valFileName = 'mView_sameSetTrain_axialCropped_fullAxis_1val_batch_' + str(i) + '_' + str(i + 1) + '_test_' + str(j) + '_val_' + '_validationResult'
+            main_func(use, j, i, modelName, trainFileName, secondModelName)
+            perform_validation(modelName, i, valFileName, secondModelName)
 
 if __name__ == '__main__':
     main()
