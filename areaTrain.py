@@ -15,20 +15,22 @@ from sklearn.model_selection import train_test_split
 from torch.optim import lr_scheduler
 from tqdm import tqdm
 
-import archs
-#import areaArchs
+#import archs
+import areaArchs
 import losses
-from dataset import Dataset
-from metrics import iou_score
-from metrics import dice_coef
+from areaDataset import areaDataset
+#from metrics import iou_score
+#from metrics import dice_coef
+from sklearn.metrics import mean_squared_error
 from utils import AverageMeter, str2bool
 
 import matplotlib.pyplot as plt
 
-ARCH_NAMES = archs.__all__
-#ARCH_NAMES = areaArchs.__all__
+#ARCH_NAMES = archs.__all__
+ARCH_NAMES = areaArchs.__all__
 LOSS_NAMES = losses.__all__
 LOSS_NAMES.append('BCEWithLogitsLoss')
+LOSS_NAMES.append('MSELoss')
 
 
 def parse_args():
@@ -107,9 +109,11 @@ def parse_args():
 
 
 def train(config, train_loader, model, criterion, optimizer):
+    #avg_meters = {'loss': AverageMeter(),
+    #              'iou': AverageMeter(),
+    #              'dice': AverageMeter()}
     avg_meters = {'loss': AverageMeter(),
-                  'iou': AverageMeter(),
-                  'dice': AverageMeter()}
+                  'mse': AverageMeter()}
 
     model.train()
 
@@ -119,6 +123,7 @@ def train(config, train_loader, model, criterion, optimizer):
         #target = target.cuda()
         #print(target.shape)
         #exit()
+        #target = target.detach().numpy()
 
         # compute output
         if config['deep_supervision']:
@@ -127,13 +132,17 @@ def train(config, train_loader, model, criterion, optimizer):
             for output in outputs:
                 loss += criterion(output, target)
             loss /= len(outputs)
-            iou = iou_score(outputs[-1], target)
-            dice = dice_coef(outputs[-1], target)
+            #iou = iou_score(outputs[-1], target)
+            #dice = dice_coef(outputs[-1], target)
         else:
             output = model(input)
-            loss = criterion(output, target)
-            iou = iou_score(output, target)
-            dice = dice_coef(output, target)
+            #print(output.shape)
+            #print(target.shape)
+            #exit()
+            loss = criterion(output.float(), target.float())
+            #iou = iou_score(output, target)
+            #dice = dice_coef(output, target)
+            mse = mean_squared_error(output.detach().numpy(), target.detach().numpy())
 
         # compute gradient and do optimizing step
         optimizer.zero_grad()
@@ -141,27 +150,36 @@ def train(config, train_loader, model, criterion, optimizer):
         optimizer.step()
 
         avg_meters['loss'].update(loss.item(), input.size(0))
-        avg_meters['iou'].update(iou, input.size(0))
-        avg_meters['dice'].update(dice, input.size(0))
+        #avg_meters['iou'].update(iou, input.size(0))
+        #avg_meters['dice'].update(dice, input.size(0))
+        avg_meters['mse'].update(mse, input.size(0))
 
+        #postfix = OrderedDict([
+        #    ('loss', avg_meters['loss'].avg),
+        #    ('iou', avg_meters['iou'].avg),
+        #    ('dice', avg_meters['dice'].avg),
+        #])
         postfix = OrderedDict([
             ('loss', avg_meters['loss'].avg),
-            ('iou', avg_meters['iou'].avg),
-            ('dice', avg_meters['dice'].avg),
+            ('mse', avg_meters['mse'].avg),
         ])
         pbar.set_postfix(postfix)
         pbar.update(1)
     pbar.close()
 
+    #return OrderedDict([('loss', avg_meters['loss'].avg),
+    #                    ('iou', avg_meters['iou'].avg),
+    #                    ('dice', avg_meters['dice'].avg)])
     return OrderedDict([('loss', avg_meters['loss'].avg),
-                        ('iou', avg_meters['iou'].avg),
-                        ('dice', avg_meters['dice'].avg)])
+                        ('mse', avg_meters['mse'].avg)])
 
 
 def validate(config, val_loader, model, criterion):
+    #avg_meters = {'loss': AverageMeter(),
+    #              'iou': AverageMeter(),
+    #              'dice': AverageMeter(),}
     avg_meters = {'loss': AverageMeter(),
-                  'iou': AverageMeter(),
-                  'dice': AverageMeter(),}
+                  'mse': AverageMeter(),}
 
     # switch to evaluate mode
     model.eval()
@@ -171,6 +189,7 @@ def validate(config, val_loader, model, criterion):
         for input, target, _ in val_loader:
             #input = input.cuda()
             #target = target.cuda()
+            #target = target.detach().numpy()
 
             # compute output
             if config['deep_supervision']:
@@ -179,30 +198,38 @@ def validate(config, val_loader, model, criterion):
                 for output in outputs:
                     loss += criterion(output, target)
                 loss /= len(outputs)
-                iou = iou_score(outputs[-1], target)
-                dice = dice_coef(outputs[-1], target)
+                #iou = iou_score(outputs[-1], target)
+                #dice = dice_coef(outputs[-1], target)
             else:
                 output = model(input)
-                loss = criterion(output, target)
-                iou = iou_score(output, target)
-                dice = dice_coef(output, target)
+                loss = criterion(output.float(), target.float())
+                #iou = iou_score(output, target)
+                #dice = dice_coef(output, target)
+                mse = mean_squared_error(output.detach().numpy(), target.detach().numpy())
 
             avg_meters['loss'].update(loss.item(), input.size(0))
-            avg_meters['iou'].update(iou, input.size(0))
-            avg_meters['dice'].update(dice, input.size(0))
+            #avg_meters['iou'].update(iou, input.size(0))
+            #avg_meters['dice'].update(dice, input.size(0))
+            avg_meters['mse'].update(mse, input.size(0))
 
+            #postfix = OrderedDict([
+            #    ('loss', avg_meters['loss'].avg),
+            #    ('iou', avg_meters['iou'].avg),
+            #    ('dice', avg_meters['dice'].avg)
+            #])
             postfix = OrderedDict([
                 ('loss', avg_meters['loss'].avg),
-                ('iou', avg_meters['iou'].avg),
-                ('dice', avg_meters['dice'].avg)
+                ('mse', avg_meters['mse'].avg),
             ])
             pbar.set_postfix(postfix)
             pbar.update(1)
         pbar.close()
 
+    #return OrderedDict([('loss', avg_meters['loss'].avg),
+    #                    ('iou', avg_meters['iou'].avg),
+    #                    ('dice', avg_meters['dice'].avg)])
     return OrderedDict([('loss', avg_meters['loss'].avg),
-                        ('iou', avg_meters['iou'].avg),
-                        ('dice', avg_meters['dice'].avg)])
+                        ('mse', avg_meters['mse'].avg)])
 
 
 def main():
@@ -236,12 +263,12 @@ def main():
 
     # create model
     print("=> creating model %s" % config['arch'])
-    model = archs.__dict__[config['arch']](config['num_classes'],
-                                           config['input_channels'],
-                                           config['deep_supervision'])
-    #model = areaArchs.__dict__[config['arch']](config['num_classes'],
+    #model = archs.__dict__[config['arch']](config['num_classes'],
     #                                       config['input_channels'],
     #                                       config['deep_supervision'])
+    model = areaArchs.__dict__[config['arch']](config['num_classes'],
+                                           config['input_channels'],
+                                           config['deep_supervision'])
 
     #model = model.cuda()
 
@@ -273,13 +300,20 @@ def main():
     img_ids = [os.path.splitext(os.path.basename(p))[0] for p in img_ids]
 
     #train_img_ids, val_img_ids = train_test_split(img_ids, test_size=0.2, random_state=41)
-    val_idx = [0, 1]
+    #val_idx = [0,1]
+    val_idx = ["DET0002701", "DET0002801"]
     val_img_ids = []
     train_img_ids = []
 
+    #for image in img_ids:
+    #    im_begin = image.split('.')[0]
+    #    if int(im_begin[-1]) in val_idx:
+    #        val_img_ids.append(image)
+    #    else:
+    #        train_img_ids.append(image)
     for image in img_ids:
-        im_begin = image.split('.')[0]
-        if int(im_begin[-1]) in val_idx:
+        im_begin = image.split('_')[0]
+        if im_begin in val_idx:
             val_img_ids.append(image)
         else:
             train_img_ids.append(image)
@@ -318,7 +352,7 @@ def main():
         transforms.Normalize(),
     ])
     
-    train_dataset = Dataset(
+    train_dataset = areaDataset(
         img_ids=train_img_ids,
         img_dir=os.path.join('inputs', config['dataset'], 'images'),
         mask_dir=os.path.join('inputs', config['dataset'], 'masks'),
@@ -326,7 +360,7 @@ def main():
         mask_ext=config['mask_ext'],
         num_classes=config['num_classes'],
         transform=train_transform)
-    val_dataset = Dataset(
+    val_dataset = areaDataset(
         img_ids=val_img_ids,
         img_dir=os.path.join('inputs', config['dataset'], 'images'),
         mask_dir=os.path.join('inputs', config['dataset'], 'masks'),
@@ -348,19 +382,28 @@ def main():
         num_workers=config['num_workers'],
         drop_last=False)
 
+    #log = OrderedDict([
+    #    ('epoch', []),
+    #    ('lr', []),
+    #    ('loss', []),
+    #    ('iou', []),
+    #    ('val_loss', []),
+    #    ('val_iou', []),
+    #    ('dice', []),
+    #])
     log = OrderedDict([
         ('epoch', []),
         ('lr', []),
         ('loss', []),
-        ('iou', []),
+        ('mse', []),
         ('val_loss', []),
-        ('val_iou', []),
-        ('dice', []),
+        ('val_mse', []),
     ])
 
-    best_iou = 0
+    #best_iou = 0
     trigger = 0
-    best_dice = 0
+    #best_dice = 0
+    best_mse = float("inf")
     for epoch in range(config['epochs']):
         print('Epoch [%d/%d]' % (epoch, config['epochs']))
 
@@ -374,16 +417,19 @@ def main():
         elif config['scheduler'] == 'ReduceLROnPlateau':
             scheduler.step(val_log['loss'])
 
-        print('loss %.4f - iou %.4f - val_loss %.4f - val_iou %.4f'
-              % (train_log['loss'], train_log['iou'], val_log['loss'], val_log['iou']))
+        #print('loss %.4f - iou %.4f - val_loss %.4f - val_iou %.4f'
+        #      % (train_log['loss'], train_log['iou'], val_log['loss'], val_log['iou']))
+        print('loss %.4f - mse %.4f - val_loss %.4f - val_mse %.4f'
+              % (train_log['loss'], train_log['mse'], val_log['loss'], val_log['mse']))
 
         log['epoch'].append(epoch)
         log['lr'].append(config['lr'])
         log['loss'].append(train_log['loss'])
-        log['iou'].append(train_log['iou'])
+        #log['iou'].append(train_log['iou'])
+        log['mse'].append(train_log['mse'])
         log['val_loss'].append(val_log['loss'])
-        log['val_iou'].append(val_log['iou'])
-        log['dice'].append(val_log['dice'])
+        log['val_mse'].append(val_log['mse'])
+        #log['dice'].append(val_log['dice'])
 
         pd.DataFrame(log).to_csv('models/%s/log.csv' %
                                  config['name'], index=False)
@@ -397,10 +443,18 @@ def main():
             print("=> saved best model")
             trigger = 0
         '''
+        '''
         if val_log['dice'] > best_dice:
             torch.save(model.state_dict(), 'models/%s/model.pth' %
                        config['name'])
             best_dice = val_log['dice']
+            print("=> saved best model")
+            trigger = 0
+        '''
+        if val_log['mse'] < best_mse:
+            torch.save(model.state_dict(), 'models/%s/model.pth' %
+                       config['name'])
+            best_mse = val_log['mse']
             print("=> saved best model")
             trigger = 0
 

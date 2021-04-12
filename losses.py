@@ -37,3 +37,16 @@ class LovaszHingeLoss(nn.Module):
         loss = lovasz_hinge(input, target, per_image=True)
 
         return loss
+
+class MSELoss(nn.Module):
+    def __init__(self):
+        super().__init__()
+
+    def forward(self, input, target):
+        input = input.squeeze()
+        target = target.squeeze()
+        loss = nn.MSELoss(reduction='mean')
+        #print(input.size())
+        #print(target.size())
+        #exit()
+        return loss(input, target)
