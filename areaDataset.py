@@ -61,8 +61,8 @@ class areaDataset(torch.utils.data.Dataset):
         #for i in range(self.num_classes):
         #    mask.append(cv2.imread(os.path.join(self.mask_dir, str(i),
         #                img_id + self.mask_ext), cv2.IMREAD_GRAYSCALE)[..., None])
+        mask = cv2.imread(os.path.join(self.mask_dir, "1", img_id + self.mask_ext), cv2.IMREAD_GRAYSCALE)[..., None]
         #mask = np.dstack(mask)
-        mask = cv2.imread(os.path.join(self.mask_dir, "1", img_id + self.mask_ext))
 
         if self.transform is not None:
             augmented = self.transform(image=img, mask=mask)
@@ -71,8 +71,8 @@ class areaDataset(torch.utils.data.Dataset):
         
         img = img.astype('float32') / 255
         img = img.transpose(2, 0, 1)
-        #mask = mask.astype('float32') / 255
-        #mask = mask.transpose(2, 0, 1)
+        mask = mask.astype('float32') / 255
+        mask = mask.transpose(2, 0, 1)
         maskArea = np.count_nonzero(np.asarray(mask))
         
-        return img, maskArea, {'img_id': img_id}
+        return img, (mask, maskArea), {'img_id': img_id}

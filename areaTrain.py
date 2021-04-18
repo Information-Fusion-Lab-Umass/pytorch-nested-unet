@@ -31,6 +31,7 @@ ARCH_NAMES = areaArchs.__all__
 LOSS_NAMES = losses.__all__
 LOSS_NAMES.append('BCEWithLogitsLoss')
 LOSS_NAMES.append('MSELoss')
+LOSS_NAMES.append('MSEAndBCEDiceLoss')
 
 
 def parse_args():
@@ -121,7 +122,8 @@ def train(config, train_loader, model, criterion, optimizer):
     for input, target, _ in train_loader:
         #input = input.cuda()
         #target = target.cuda()
-        #print(target.shape)
+        #print(target[0].shape)
+        #print(target[1].shape)
         #exit()
         #target = target.detach().numpy()
 
@@ -139,10 +141,10 @@ def train(config, train_loader, model, criterion, optimizer):
             #print(output.shape)
             #print(target.shape)
             #exit()
-            loss = criterion(output.float(), target.float())
+            loss = criterion(output, target)
             #iou = iou_score(output, target)
             #dice = dice_coef(output, target)
-            mse = mean_squared_error(output.detach().numpy(), target.detach().numpy())
+            mse = mean_squared_error(output[1].detach().numpy(), target[1].detach().numpy())
 
         # compute gradient and do optimizing step
         optimizer.zero_grad()
@@ -202,10 +204,10 @@ def validate(config, val_loader, model, criterion):
                 #dice = dice_coef(outputs[-1], target)
             else:
                 output = model(input)
-                loss = criterion(output.float(), target.float())
+                loss = criterion(output, target)
                 #iou = iou_score(output, target)
                 #dice = dice_coef(output, target)
-                mse = mean_squared_error(output.detach().numpy(), target.detach().numpy())
+                mse = mean_squared_error(output[1].detach().numpy(), target[1].detach().numpy())
 
             avg_meters['loss'].update(loss.item(), input.size(0))
             #avg_meters['iou'].update(iou, input.size(0))

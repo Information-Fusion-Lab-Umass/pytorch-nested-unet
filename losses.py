@@ -50,3 +50,36 @@ class MSELoss(nn.Module):
         #print(target.size())
         #exit()
         return loss(input, target)
+
+class MSEAndBCEDiceLoss(nn.Module):
+    def __init__(self):
+        super().__init__()
+
+    def forward(self, input, target):
+        input0 = input[0]
+        input1 = input[1]
+        target0 = target[0]
+        target1 = target[1]
+
+        # BCEDice
+        bce = F.binary_cross_entropy_with_logits(input0, target0)
+        smooth = 1e-5
+        input0 = torch.sigmoid(input0)
+        num = target0.size(0)
+        input0 = input0.view(num, -1)
+        target0 = target0.view(num, -1)
+        intersection = (input0 * target0)
+        dice = (2. * intersection.sum(1) + smooth) / (input0.sum(1) + target0.sum(1) + smooth)
+        dice = 1 - dice.sum() / num
+        bcediceloss = 0.5 * bce + dice
+
+        # MSE
+        input1 = input1.float()
+        target1 = target1.float()
+        input1 = input1.squeeze()
+        target1 = target1.squeeze()
+        loss = nn.MSELoss(reduction='mean')
+        mseloss = loss(input1, target1)
+
+        # Split the loss between segmentation and area
+        return (bcediceloss * 0.5) + (mseloss * 0.5)
