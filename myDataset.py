@@ -79,10 +79,10 @@ class Dataset(torch.utils.data.Dataset):
         	            img_id + self.mask_ext), cv2.IMREAD_GRAYSCALE)[..., None])
         mask2 = np.dstack(mask2)        
 
-        if self.transform is not None:
-            augmented = self.transform(image=img, mask=mask)
-            img = augmented['image']
-            mask = augmented['mask']
+        #if self.transform is not None:
+        #    augmented = self.transform(image=img, mask=mask)
+        #    img = augmented['image']
+        #    mask = augmented['mask']
                 
         mask1 = mask1.astype('float32') / 255
         mask1 = mask1.transpose(2, 0, 1)

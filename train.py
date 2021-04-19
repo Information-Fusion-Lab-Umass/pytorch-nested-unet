@@ -26,6 +26,8 @@ ARCH_NAMES = archs.__all__
 LOSS_NAMES = losses.__all__
 LOSS_NAMES.append('BCEWithLogitsLoss')
 
+import random
+
 pretrained_model = None
 
 def parse_args():
@@ -122,7 +124,7 @@ def train(config, train_loader, model, criterion, optimizer):
         input2 = input2.cuda()
    
         #pretrained_model = torch.load(modelFile)
-        _, embeddings = pretrained_model(input2)         
+        _, embeddings = pretrained_model(input2)
 
         target1 = target1.cuda()
 
@@ -224,6 +226,36 @@ def main():
             config['name'] = '%s_%s_woDS' % (config['dataset'], config['arch'])
     os.makedirs('models/%s' % config['name'], exist_ok=True)
 
+    f = open('ids.txt', 'r')
+    lines = f.readlines()
+
+    lookup = []
+    for i in range(len(lines)):
+        lookup.append(lines[i].strip())
+
+    rand_num = random.sample(range(1, 100), 20)
+
+    val_idx = []
+    for num in rand_num:
+        val_idx.append(lookup[num - 1])
+
+    # Data loading code
+    img_ids = glob(os.path.join('inputs', config['dataset'], 'images', '*' + config['img_ext']))
+    img_ids = [os.path.splitext(os.path.basename(p))[0] for p in img_ids]
+
+    #train_img_ids, val_img_ids = train_test_split(img_ids, test_size=0.2, random_state=41)
+    #val_idx = [0, 1]
+    val_img_ids = []
+    train_img_ids = []
+
+    for image in img_ids:
+        im_begin = image.split('_')[0]
+        if im_begin in val_idx:
+            val_img_ids.append(image)
+        else:
+            train_img_ids.append(image)
+
+
     print('-' * 20)
     for key in config:
         print('%s: %s' % (key, config[key]))
@@ -271,21 +303,17 @@ def main():
     else:
         raise NotImplementedError
 
-    # Data loading code
-    img_ids = glob(os.path.join('inputs', config['dataset'], 'images', '*' + config['img_ext']))
-    img_ids = [os.path.splitext(os.path.basename(p))[0] for p in img_ids]
-
     #train_img_ids, val_img_ids = train_test_split(img_ids, test_size=0.2, random_state=41)
-    val_idx = [0, 1]
-    val_img_ids = []
-    train_img_ids = []
+    # val_idx = [0, 1]
+    # val_img_ids = []
+    # train_img_ids = []
 
-    for image in img_ids:
-        im_begin = image.split('.')[0]
-        if int(im_begin[-1]) in val_idx:
-            val_img_ids.append(image)
-        else:
-            train_img_ids.append(image)
+    # for image in img_ids:
+    #     im_begin = image.split('.')[0]
+    #     if int(im_begin[-1]) in val_idx:
+    #         val_img_ids.append(image)
+    #     else:
+    #         train_img_ids.append(image)
 
     train_transform = Compose([
         transforms.Resize(config['input_h'], config['input_w']),
@@ -319,6 +347,8 @@ def main():
         mask_dir_view2=os.path.join('inputs', config['dataset2'], 'masks'),
         #transform=val_transform,
 )
+
+    #print('length of train dataset is ', len(train_dataset), ' and len of val set is ', len(val_dataset))    
 
     train_loader = torch.utils.data.DataLoader(
         train_dataset,
