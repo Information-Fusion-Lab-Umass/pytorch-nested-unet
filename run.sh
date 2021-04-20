@@ -1,2 +1,2 @@
 #!/bin/sh
-python train.py --dataset ax_crop_dataset --dataset2 fa_dataset --arch MultiViewNestedUNet --num_classes=2
+python train.py --dataset short_axis_resize --dataset2 long_axis_resize --arch MultiViewNestedUNet --num_classes=2 --secondViewPath models/long_axis_single_view/model.pth
