@@ -7,7 +7,7 @@ try:
 except ImportError:
     pass
 
-__all__ = ['BCEDiceLoss', 'LovaszHingeLoss']
+__all__ = ['BCEDiceLoss', 'LovaszHingeLoss', 'MSEAndBCEDiceLoss']
 
 
 class BCEDiceLoss(nn.Module):
@@ -46,8 +46,6 @@ class MSELoss(nn.Module):
         input = input.squeeze()
         target = target.squeeze()
         loss = nn.MSELoss(reduction='mean')
-        #print(input.size())
-        #print(target.size())
         #exit()
         return loss(input, target)
 
@@ -55,11 +53,11 @@ class MSEAndBCEDiceLoss(nn.Module):
     def __init__(self):
         super().__init__()
 
-    def forward(self, input, target):
-        input0 = input[0]
-        input1 = input[1]
-        target0 = target[0]
-        target1 = target[1]
+    def forward(self, segMask, areaCalc, target, maskArea):
+        input0 = segMask
+        input1 = areaCalc
+        target0 = target
+        target1 = maskArea
 
         # BCEDice
         bce = F.binary_cross_entropy_with_logits(input0, target0)
@@ -78,8 +76,9 @@ class MSEAndBCEDiceLoss(nn.Module):
         target1 = target1.float()
         input1 = input1.squeeze()
         target1 = target1.squeeze()
+        #print('input1 which should be area Calculated is ', input1, ' and target area is ', target1)
         loss = nn.MSELoss(reduction='mean')
-        mseloss = loss(input1, target1)
+        mseloss = loss(input1, target1) 
 
         # Split the loss between segmentation and area
         return (bcediceloss * 0.5) + (mseloss * 0.5)

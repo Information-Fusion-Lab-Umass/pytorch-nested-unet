@@ -1,5 +1,6 @@
 import torch
 from torch import nn
+import torch.nn.functional as F
 import numpy as np
 
 __all__ = ['UNet', 'NestedUNet']
@@ -25,6 +26,19 @@ class VGGBlock(nn.Module):
 
         return out
 
+class FCBlock(nn.Module):
+    def __init__(self, in_channels, middle_channels, out_channels):
+        super().__init__()
+        self.fc1 = nn.Linear(in_channels, middle_channels)
+        self.fc2 = nn.Linear(middle_channels, out_channels)
+
+    def forward(self, x):
+        mid = self.fc1(x)
+        mid = F.relu(mid)
+        out = self.fc2(mid)
+        out = torch.flatten(out)
+        
+        return out
 
 class UNet(nn.Module):
     def __init__(self, num_classes, input_channels=3, **kwargs):
@@ -96,6 +110,8 @@ class NestedUNet(nn.Module):
 
         self.conv0_4 = VGGBlock(nb_filter[0]*4+nb_filter[1], nb_filter[0], nb_filter[0])
 
+        self.regression = FCBlock(9216, 8, 1)
+
         if self.deep_supervision:
             self.final1 = nn.Conv2d(nb_filter[0], num_classes, kernel_size=1)
             self.final2 = nn.Conv2d(nb_filter[0], num_classes, kernel_size=1)
@@ -146,5 +162,7 @@ class NestedUNet(nn.Module):
 
         else:
             output = self.final(x0_4)
-            areas = self.area(output)
+            masked = output[:,0,:,:]
+            masked = torch.reshape(masked, (-1,9216))
+            areas = self.regression(masked)
             return output, areas
