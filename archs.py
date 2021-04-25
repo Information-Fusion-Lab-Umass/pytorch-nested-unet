@@ -216,6 +216,9 @@ class MultiViewNestedUNet(nn.Module):
 
         self.pool = nn.MaxPool2d(2, 2)
         self.up = nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True)
+        self.up4 = nn.Upsample(scale_factor=4, mode='bilinear', align_corners=True)
+        self.up8 = nn.Upsample(scale_factor=8, mode='bilinear', align_corners=True)
+        self.up16 = nn.Upsample(scale_factor=16, mode='bilinear', align_corners=True)
 
         self.conv0_0 = VGGBlock(input_channels, nb_filter[0], nb_filter[0])
         self.conv1_0 = VGGBlock(nb_filter[0], nb_filter[1], nb_filter[1])
@@ -269,18 +272,18 @@ class MultiViewNestedUNet(nn.Module):
 
         x4_0 = self.conv4_0(self.pool(x3_0))
         x4_0 = self.conv_combine4_0(torch.cat([x4_0, input2], 1))
-        
+
         x3_1 = self.conv3_1(torch.cat([x3_0, self.up(x4_0)], 1))
-        x3_1 = self.conv_combine3_1(torch.cat([x3_1, input2], 1))
+        x3_1 = self.conv_combine3_1(torch.cat([x3_1, self.up(input2)], 1))
 
         x2_2 = self.conv2_2(torch.cat([x2_0, x2_1, self.up(x3_1)], 1))
-        x2_2 = self.conv_combine2_2(torch.cat([x2_2, input2], 1))
+        x2_2 = self.conv_combine2_2(torch.cat([x2_2, self.up4(input2)], 1))
 
         x1_3 = self.conv1_3(torch.cat([x1_0, x1_1, x1_2, self.up(x2_2)], 1))
-        x1_3 = self.conv_combine1_3(torch.cat([x1_3, input2], 1))
+        x1_3 = self.conv_combine1_3(torch.cat([x1_3, self.up8(input2)], 1))
 
         x0_4 = self.conv0_4(torch.cat([x0_0, x0_1, x0_2, x0_3, self.up(x1_3)], 1))
-        x0_4 = self.conv_combine0_4(torch.cat([x0_4, input2], 1))
+        x0_4 = self.conv_combine0_4(torch.cat([x0_4, self.up16(input2)], 1))
 
         if self.deep_supervision:
             output1 = self.final1(x0_1)
