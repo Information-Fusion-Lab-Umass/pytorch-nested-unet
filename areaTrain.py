@@ -111,13 +111,44 @@ def parse_args():
     return config
 
 
-def train(config, train_loader, model, criterion, optimizer):
+def train(config, train_loader, model, criterion, optimizer, epoch):
     avg_meters = {'loss': AverageMeter(),
                   'iou': AverageMeter(),
                   'dice': AverageMeter(),
                   'mse': AverageMeter()}
 
+    for name, layer in model.named_modules():
+        if (epoch >= 25):
+            if "regression" not in name:
+                layer.requires_grad = False
+            else:
+                layer.requires_grad = True
+        else:
+            if "regression" in name:
+                layer.requires_grad = False
+            else:
+                layer.requires_grad = True
+
     model.train()
+
+    '''
+    if ((epoch+1) % 10 == 0):
+        for counter, parameter in enumerate(model.parameters()):
+            if ((counter+1) in [121,122,123,124]):
+                parameter.requires_grad = False
+            elif ((counter+1) in [125,126]):
+                pass
+            else:
+                parameter.requires_grad = True
+    elif ((epoch+1) % 5 == 0):
+        for counter, parameter in enumerate(model.parameters()):
+            if ((counter+1) in [121,122,123,124]):
+                parameter.requires_grad = True
+            elif ((counter+1) in [125,126]):
+                pass
+            else:
+                parameter.requires_grad = False
+    '''
 
     pbar = tqdm(total=len(train_loader))
     for input, target, maskArea, _ in train_loader:
@@ -139,7 +170,7 @@ def train(config, train_loader, model, criterion, optimizer):
             segMask, areaCalc = model(input)
             segMask = segMask.cuda()
             areaCalc = areaCalc.cuda()
-            loss = criterion(segMask, areaCalc, target, maskArea)
+            loss = criterion(segMask, areaCalc, target, maskArea, epoch)
             iou = iou_score(segMask, target)
             dice = dice_coef(segMask, target)
             #mse = mean_squared_error(output[1].detach().numpy(), target[1].detach().numpy())
@@ -171,7 +202,7 @@ def train(config, train_loader, model, criterion, optimizer):
                         ('dice', avg_meters['dice'].avg),
                         ('mse', avg_meters['mse'].avg)])
 
-def validate(config, val_loader, model, criterion):
+def validate(config, val_loader, model, criterion, epoch):
     avg_meters = {'loss': AverageMeter(),
                   'iou': AverageMeter(),
                   'dice': AverageMeter(),
@@ -200,7 +231,7 @@ def validate(config, val_loader, model, criterion):
                 segMask, areaCalc = model(input)
                 segMask = segMask.cuda()
                 areaCalc = areaCalc.cuda()
-                loss = criterion(segMask, areaCalc, target, maskArea)
+                loss = criterion(segMask, areaCalc, target, maskArea, epoch)
                 lossMSE = nn.MSELoss(reduction='mean')
                 mse = lossMSE(areaCalc, maskArea)
                 
@@ -386,9 +417,9 @@ def main():
         print('Epoch [%d/%d]' % (epoch, config['epochs']))
 
         # train for one epoch
-        train_log = train(config, train_loader, model, criterion, optimizer)
+        train_log = train(config, train_loader, model, criterion, optimizer, epoch)
         # evaluate on validation set
-        val_log = validate(config, val_loader, model, criterion)
+        val_log = validate(config, val_loader, model, criterion, epoch)
 
         if config['scheduler'] == 'CosineAnnealingLR':
             scheduler.step()

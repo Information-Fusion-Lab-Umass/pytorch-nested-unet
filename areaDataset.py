@@ -57,12 +57,12 @@ class areaDataset(torch.utils.data.Dataset):
         
         img = cv2.imread(os.path.join(self.img_dir, img_id + self.img_ext))
 
-        mask = []
-        for i in range(self.num_classes):
-            mask.append(cv2.imread(os.path.join(self.mask_dir, str(i),
-                        img_id + self.mask_ext), cv2.IMREAD_GRAYSCALE)[..., None])
-        #mask = cv2.imread(os.path.join(self.mask_dir, "1", img_id + self.mask_ext), cv2.IMREAD_GRAYSCALE)[..., None]
-        mask = np.dstack(mask)
+        #mask = []
+        #for i in range(self.num_classes):
+        #    mask.append(cv2.imread(os.path.join(self.mask_dir, str(i),
+        #                img_id + self.mask_ext), cv2.IMREAD_GRAYSCALE)[..., None])
+        mask = cv2.imread(os.path.join(self.mask_dir, "1", img_id + self.mask_ext), cv2.IMREAD_GRAYSCALE)[..., None]
+        #mask = np.dstack(mask)
 
         if self.transform is not None:
             augmented = self.transform(image=img, mask=mask)
