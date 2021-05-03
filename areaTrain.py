@@ -117,38 +117,7 @@ def train(config, train_loader, model, criterion, optimizer, epoch):
                   'dice': AverageMeter(),
                   'mse': AverageMeter()}
 
-    for name, layer in model.named_modules():
-        if (epoch >= 25):
-            if "regression" not in name:
-                layer.requires_grad = False
-            else:
-                layer.requires_grad = True
-        else:
-            if "regression" in name:
-                layer.requires_grad = False
-            else:
-                layer.requires_grad = True
-
     model.train()
-
-    '''
-    if ((epoch+1) % 10 == 0):
-        for counter, parameter in enumerate(model.parameters()):
-            if ((counter+1) in [121,122,123,124]):
-                parameter.requires_grad = False
-            elif ((counter+1) in [125,126]):
-                pass
-            else:
-                parameter.requires_grad = True
-    elif ((epoch+1) % 5 == 0):
-        for counter, parameter in enumerate(model.parameters()):
-            if ((counter+1) in [121,122,123,124]):
-                parameter.requires_grad = True
-            elif ((counter+1) in [125,126]):
-                pass
-            else:
-                parameter.requires_grad = False
-    '''
 
     pbar = tqdm(total=len(train_loader))
     for input, target, maskArea, _ in train_loader:
@@ -416,6 +385,38 @@ def main():
     for epoch in range(config['epochs']):
         print('Epoch [%d/%d]' % (epoch, config['epochs']))
 
+        # Freeze Segmentation Layers, Update model, optimizer, and scheduler
+        if (epoch == 25):
+            # Freeze all but the regression (area) layers
+            for param in model.parameters():
+                param.requires_grad = False
+            for param in model.regression.parameters():
+                param.requires_grad = True
+
+            # Update the optimizer to only include the regression layers
+            if config['optimizer'] == 'Adam':
+                optimizer = optim.Adam(
+                    model.regression.parameters(), lr=config['lr'], weight_decay=config['weight_decay'])
+            elif config['optimizer'] == 'SGD':
+                optimizer = optim.SGD(model.regression.parameters(), lr=config['lr'], momentum=config['momentum'],
+                                    nesterov=config['nesterov'], weight_decay=config['weight_decay'])
+            else:
+                raise NotImplementedError
+
+            # Update the scheduler to include the new optimizer
+            if config['scheduler'] == 'CosineAnnealingLR':
+                scheduler = lr_scheduler.CosineAnnealingLR(
+                    optimizer, T_max=config['epochs'], eta_min=config['min_lr'])
+            elif config['scheduler'] == 'ReduceLROnPlateau':
+                scheduler = lr_scheduler.ReduceLROnPlateau(optimizer, factor=config['factor'], patience=config['patience'],
+                                                        verbose=1, min_lr=config['min_lr'])
+            elif config['scheduler'] == 'MultiStepLR':
+                scheduler = lr_scheduler.MultiStepLR(optimizer, milestones=[int(e) for e in config['milestones'].split(',')], gamma=config['gamma'])
+            elif config['scheduler'] == 'ConstantLR':
+                scheduler = None
+            else:
+                raise NotImplementedError
+
         # train for one epoch
         train_log = train(config, train_loader, model, criterion, optimizer, epoch)
         # evaluate on validation set
@@ -438,7 +439,7 @@ def main():
         log['mse'].append(train_log['mse'])
         log['val_loss'].append(val_log['loss'])
         log['val_mse'].append(val_log['mse'])
-        #log['iou'].append(val_log['iou'])
+        log['iou'].append(val_log['iou'])
         log['dice'].append(val_log['dice'])
 
         pd.DataFrame(log).to_csv('models/%s/log.csv' %
