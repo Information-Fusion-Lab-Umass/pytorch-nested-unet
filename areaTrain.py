@@ -24,6 +24,7 @@ from metrics import dice_coef
 from sklearn.metrics import mean_squared_error
 from utils import AverageMeter, str2bool
 
+import numpy as np
 import matplotlib.pyplot as plt
 
 import random
@@ -471,6 +472,38 @@ def main():
             break
 
         torch.cuda.empty_cache()
+
+    # Create Plots
+
+    # Segmentation Plot
+    x_axis = np.arange(0,config['epochs']-5)
+    plt.plot(x_axis, log['loss'][0:25], label="train_loss")
+    plt.plot(x_axis, log['val_loss'][0:25], label="val_loss")
+    plt.plot(x_axis, log['iou'][0:25], label="train_iou")
+    plt.plot(x_axis, log['val_iou'][0:25], label="val_iou")
+    plt.plot(x_axis, log['dice'][0:25], label="train_dice")
+    plt.plot(x_axis, log['val_dice'][0:25], label="val_dice")
+    plt.xlabel("Epoch")
+    plt.title("Segmentation - {}".format(config['name']))
+    plt.legend()
+
+    plt.savefig('models/%s/seg_plot.png' % config['name'], dpi=300, bbox_inches='tight')
+
+    plt.clf()
+
+    # Area Plot
+    x_axis = np.arange(config['epochs']-5,config['epochs'])
+    #plt.plot(x_axis, log['loss'][25:30], label="train_loss")
+    #plt.plot(x_axis, log['val_loss'][25:30], label="val_loss")
+    plt.plot(x_axis, log['mse'][25:30], label="train_mse")
+    plt.plot(x_axis, log['val_mse'][25:30], label="val_mse")
+    plt.xlabel("Epoch")
+    plt.title("Area - {}".format(config['name']))
+    plt.legend()
+
+    plt.savefig('models/%s/area_plot.png' % config['name'], dpi=300, bbox_inches='tight')
+
+    plt.clf()
 
 
 if __name__ == '__main__':
