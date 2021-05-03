@@ -371,11 +371,13 @@ def main():
         ('epoch', []),
         ('lr', []),
         ('loss', []),
+        ('iou', []),
+        ('dice', []),
         ('mse', []),
         ('val_loss', []),
+        ('val_iou', []),
+        ('val_dice', []), 
         ('val_mse', []),
-        ('iou', []),
-        ('dice', []), 
     ])
 
     #best_iou = 0
@@ -436,11 +438,12 @@ def main():
         log['lr'].append(config['lr'])
         log['loss'].append(train_log['loss'])
         log['iou'].append(train_log['iou'])
+        log['dice'].append(train_log['dice'])
         log['mse'].append(train_log['mse'])
         log['val_loss'].append(val_log['loss'])
+        log['val_iou'].append(val_log['iou'])
+        log['val_dice'].append(val_log['dice'])
         log['val_mse'].append(val_log['mse'])
-        log['iou'].append(val_log['iou'])
-        log['dice'].append(val_log['dice'])
 
         pd.DataFrame(log).to_csv('models/%s/log.csv' %
                                  config['name'], index=False)
