@@ -477,12 +477,12 @@ def main():
 
     # Segmentation Plot
     x_axis = np.arange(0,config['epochs']-5)
-    plt.plot(x_axis, log['loss'][0:25], label="train_loss")
-    plt.plot(x_axis, log['val_loss'][0:25], label="val_loss")
-    plt.plot(x_axis, log['iou'][0:25], label="train_iou")
-    plt.plot(x_axis, log['val_iou'][0:25], label="val_iou")
-    plt.plot(x_axis, log['dice'][0:25], label="train_dice")
-    plt.plot(x_axis, log['val_dice'][0:25], label="val_dice")
+    plt.plot(x_axis, log['loss'][0:25], label="train_loss", color="r")
+    plt.plot(x_axis, log['iou'][0:25], label="train_iou", color="r", linestyle=":")
+    plt.plot(x_axis, log['dice'][0:25], label="train_dice", color="r", linestyle="--")
+    plt.plot(x_axis, log['val_loss'][0:25], label="val_loss", color="b")
+    plt.plot(x_axis, log['val_iou'][0:25], label="val_iou", color="b", linestyle=":")
+    plt.plot(x_axis, log['val_dice'][0:25], label="val_dice", color="b", linestyle="--")
     plt.xlabel("Epoch")
     plt.title("Segmentation - {}".format(config['name']))
     plt.legend()
@@ -491,17 +491,31 @@ def main():
 
     plt.clf()
 
-    # Area Plot
+    # Area Loss Plot
     x_axis = np.arange(config['epochs']-5,config['epochs'])
-    #plt.plot(x_axis, log['loss'][25:30], label="train_loss")
-    #plt.plot(x_axis, log['val_loss'][25:30], label="val_loss")
-    plt.plot(x_axis, log['mse'][25:30], label="train_mse")
-    plt.plot(x_axis, log['val_mse'][25:30], label="val_mse")
+    plt.plot(x_axis, log['loss'][25:30], label="train_loss", color="r")
+    #plt.plot(x_axis, log['mse'][25:30], label="train_mse", color="r")
+    plt.plot(x_axis, log['val_loss'][25:30], label="val_loss", color="b")
+    #plt.plot(x_axis, log['val_mse'][25:30]cd , label="val_mse", color="b")
     plt.xlabel("Epoch")
-    plt.title("Area - {}".format(config['name']))
+    plt.title("Area Loss - {}".format(config['name']))
     plt.legend()
 
-    plt.savefig('models/%s/area_plot.png' % config['name'], dpi=300, bbox_inches='tight')
+    plt.savefig('models/%s/area_loss_plot.png' % config['name'], dpi=300, bbox_inches='tight')
+
+    plt.clf()
+
+    # Area Loss Plot
+    x_axis = np.arange(config['epochs']-5,config['epochs'])
+    #plt.plot(x_axis, log['loss'][25:30], label="train_loss", color="r")
+    plt.plot(x_axis, log['mse'][25:30], label="train_mse", color="r")
+    #plt.plot(x_axis, log['val_loss'][25:30], label="val_loss", color="b")
+    plt.plot(x_axis, log['val_mse'][25:30]cd , label="val_mse", color="b")
+    plt.xlabel("Epoch")
+    plt.title("Area MSE - {}".format(config['name']))
+    plt.legend()
+
+    plt.savefig('models/%s/area_mse_plot.png' % config['name'], dpi=300, bbox_inches='tight')
 
     plt.clf()
 
