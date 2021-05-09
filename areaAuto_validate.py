@@ -671,11 +671,11 @@ def main():
             train_set = chain(range(use[0], use[0]+20), range(use[1], use[1]+20), range(use[2], use[2]+20))
             val_set = range(j, j+20)
             test_set = range(i, i+20)
-            modelName = 'shortAxis_1val_batch_' + str(i) + '_' + str(i + 20) + '_test_' + str(j) + '_' + str(j + 20) + '_val'
-            trainFileName = 'shortAxis_1val_batch_' + str(i) + '_' + str(i + 20) + '_test_' + str(j) + '_' + str(j + 20) + '_val_' + '_trainingResult'
-            valFileName = 'shortAxis_1val_batch_' + str(i) + '_' + str(i + 20) + '_test_' + str(j) + '_' + str(j + 20) + '_val_' + '_validationResult'
+            modelName = 'long_axis_resize_batch_' + str(i) + '_' + str(i + 20) + '_test_' + str(j) + '_' + str(j + 20) + '_val'
+            trainFileName = 'long_axis_resize_batch_' + str(i) + '_' + str(i + 20) + '_test_' + str(j) + '_' + str(j + 20) + '_val_' + '_trainingResult'
+            testFileName = 'long_axis_resize_batch_' + str(i) + '_' + str(i + 20) + '_test_' + str(j) + '_' + str(j + 20) + '_val_' + '_testResult'
             main_func(train_set, val_set, test_set, modelName, trainFileName)
-            perform_validation(modelName, test_set, valFileName)
+            perform_validation(modelName, test_set, testFileName)
 
 if __name__ == '__main__':
     main()
