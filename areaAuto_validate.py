@@ -524,7 +524,7 @@ def main_func(train_idx, val_set, test_set, modelName, fileName):
 def perform_validation(modelName, testNum, fileName):
     #args = parse_args()
 
-    fw = open('batch_results_val/' + fileName, 'w') 
+    fw = open('batch_results_test/' + fileName, 'w') 
     #with open('models/%s/config.yml' % args.name, 'r') as f:
     with open('models/%s/config.yml' % modelName, 'r') as f:   
         config = yaml.load(f, Loader=yaml.FullLoader)
