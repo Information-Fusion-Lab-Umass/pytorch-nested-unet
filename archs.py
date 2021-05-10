@@ -228,19 +228,19 @@ class MultiViewNestedUNet(nn.Module):
         self.conv1_1 = VGGBlock(nb_filter[1]+nb_filter[2], nb_filter[1], nb_filter[1])
         self.conv2_1 = VGGBlock(nb_filter[2]+nb_filter[3], nb_filter[2], nb_filter[2])
         self.conv3_1 = VGGBlock(nb_filter[3]+nb_filter[4], nb_filter[3], nb_filter[3])
-        self.conv_combine3_1 = VGGBlock(nb_filter[3]+nb_filter[4], nb_filter[3], nb_filter[3])
+        self.conv_combine3_1 = VGGBlock(nb_filter[3]*2, nb_filter[3], nb_filter[3])
 
         self.conv0_2 = VGGBlock(nb_filter[0]*2+nb_filter[1], nb_filter[0], nb_filter[0])
         self.conv1_2 = VGGBlock(nb_filter[1]*2+nb_filter[2], nb_filter[1], nb_filter[1])
         self.conv2_2 = VGGBlock(nb_filter[2]*2+nb_filter[3], nb_filter[2], nb_filter[2])
-        self.conv_combine2_2 = VGGBlock(nb_filter[2]+nb_filter[4], nb_filter[2], nb_filter[2])
+        self.conv_combine2_2 = VGGBlock(nb_filter[2]*2, nb_filter[2], nb_filter[2])
 
         self.conv0_3 = VGGBlock(nb_filter[0]*3+nb_filter[1], nb_filter[0], nb_filter[0])
         self.conv1_3 = VGGBlock(nb_filter[1]*3+nb_filter[2], nb_filter[1], nb_filter[1])
-        self.conv_combine1_3 = VGGBlock(nb_filter[1]+nb_filter[4], nb_filter[1], nb_filter[1])
+        self.conv_combine1_3 = VGGBlock(nb_filter[1]*2, nb_filter[1], nb_filter[1])
 
         self.conv0_4 = VGGBlock(nb_filter[0]*4+nb_filter[1], nb_filter[0], nb_filter[0])
-        self.conv_combine0_4 = VGGBlock(nb_filter[0]+nb_filter[4], nb_filter[0], nb_filter[0])
+        self.conv_combine0_4 = VGGBlock(nb_filter[0]*2, nb_filter[0], nb_filter[0])
 
         if self.deep_supervision:
             self.final1 = nn.Conv2d(nb_filter[0], num_classes, kernel_size=1)
