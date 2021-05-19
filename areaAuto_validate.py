@@ -544,20 +544,31 @@ def perform_validation(modelName, testNum, fileName):
     # create model
     print("=> creating model %s" % config['arch'])
     fw.write("=> creating model %s" % config['arch'] + '\n')
-    model = archs.__dict__[config['arch']](config['num_classes'],
+    model = areaArchs.__dict__[config['arch']](config['num_classes'],
                                            config['input_channels'],
                                            config['deep_supervision'])
 
     model = model.cuda()
 
     # Data loading code
+    f = open('ids.txt', 'r')
+    lines = f.readlines()
+
+    lookup = []
+    for i in range(len(lines)):
+        lookup.append(lines[i].strip())
+
+    test_idx = []
+    for num in testNum:
+        test_idx.append(lookup[num - 1])
+    
     img_ids = glob(os.path.join('inputs', config['dataset'], 'images', '*' + config['img_ext']))
     img_ids = [os.path.splitext(os.path.basename(p))[0] for p in img_ids]
 
     test_img_ids = []
     for img in img_ids:
-        im_begin = image.split('_')[0]
-        if im_begin in testNum:
+        im_begin = img.split('_')[0]
+        if im_begin in test_idx:
             test_img_ids.append(img)
 
     model.load_state_dict(torch.load('models/%s/model.pth' %

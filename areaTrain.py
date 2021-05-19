@@ -3,6 +3,7 @@ import os
 from collections import OrderedDict
 from glob import glob
 
+import cv2
 import pandas as pd
 import torch
 import torch.backends.cudnn as cudnn
@@ -121,7 +122,7 @@ def train(config, train_loader, model, criterion, optimizer, epoch):
     model.train()
 
     pbar = tqdm(total=len(train_loader))
-    for input, target, maskArea, _ in train_loader:
+    for count, (input, target, maskArea, _) in enumerate(train_loader):
         input = input.cuda()
         target = target.cuda()
         maskArea = maskArea.cuda()
@@ -146,6 +147,17 @@ def train(config, train_loader, model, criterion, optimizer, epoch):
             #mse = mean_squared_error(output[1].detach().numpy(), target[1].detach().numpy())
             lossMSE = nn.MSELoss(reduction='mean')
             mse = lossMSE(areaCalc, maskArea)
+
+            if (count < 3):
+                    pixels = segMask[0,0].cpu().data.numpy()
+                    pixels = np.where(pixels < 0.5, 0, pixels)
+                    pixels = np.where(pixels >= 0.5, 1, pixels)
+                    cv2.imwrite(os.path.join('outputs', config['name'], 'epoch_' + str(epoch) + '_sample_' + str(count) + '_train.jpg'), (pixels * 255).astype('uint8'))
+                    if (epoch == 0):
+                        pixels = target[0].cpu().data.numpy()
+                        pixels = np.where(pixels < 0.5, 0, pixels)
+                        pixels = np.where(pixels >= 0.5, 1, pixels)
+                        cv2.imwrite(os.path.join('outputs', config['name'], 'target_sample_' + str(count) + '_train.jpg'), (pixels * 255).astype('uint8'))
 
         # compute gradient and do optimizing step
         optimizer.zero_grad()
@@ -183,7 +195,7 @@ def validate(config, val_loader, model, criterion, epoch):
 
     with torch.no_grad():
         pbar = tqdm(total=len(val_loader))
-        for input, target, maskArea, _ in val_loader:
+        for count, (input, target, maskArea, _) in enumerate(val_loader):
             input = input.cuda()
             target = target.cuda()
             maskArea = maskArea.cuda()
@@ -207,6 +219,17 @@ def validate(config, val_loader, model, criterion, epoch):
                 
                 iou = iou_score(segMask, target)
                 dice = dice_coef(segMask, target)
+
+                if (count < 3):
+                    pixels = segMask[0,0].cpu().data.numpy()
+                    pixels = np.where(pixels < 0.5, 0, pixels)
+                    pixels = np.where(pixels >= 0.5, 1, pixels)
+                    cv2.imwrite(os.path.join('outputs', config['name'], 'epoch_' + str(epoch) + '_sample_' + str(count) + '_val.jpg'), (pixels * 255).astype('uint8'))
+                    if (epoch == 0):
+                        pixels = target[0].cpu().data.numpy()
+                        pixels = np.where(pixels < 0.5, 0, pixels)
+                        pixels = np.where(pixels >= 0.5, 1, pixels)
+                        cv2.imwrite(os.path.join('outputs', config['name'], 'target_sample_' + str(count) + '_val.jpg'), (pixels * 255).astype('uint8'))
 
             avg_meters['loss'].update(loss.item(), input.size(0))
             avg_meters['iou'].update(iou, input.size(0))
