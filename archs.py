@@ -5,6 +5,10 @@ __all__ = ['UNet', 'NestedUNet']
 
 
 class VGGBlock(nn.Module):
+    '''
+        Consists of 2 Convolution Layers with ReLU and batch normalization between them. 
+        params: Setting the filter size through the number of channels in input, middle and the final output.
+    '''
     def __init__(self, in_channels, middle_channels, out_channels):
         super().__init__()
         self.relu = nn.ReLU(inplace=True)
@@ -26,6 +30,10 @@ class VGGBlock(nn.Module):
 
 
 class UNet(nn.Module):
+    '''
+    Unet Architecture (Reference - https://arxiv.org/pdf/1505.04597.pdf)
+    params: number of classes and input channels.
+    '''	
     def __init__(self, num_classes, input_channels=3, **kwargs):
         super().__init__()
 
@@ -65,6 +73,10 @@ class UNet(nn.Module):
 
 
 class NestedUNet(nn.Module):
+	'''
+    Unet++ Architecture (Reference - https://arxiv.org/pdf/1807.10165.pdf)
+    params: number of classes and input channels.
+    '''	
     def __init__(self, num_classes, input_channels=3, deep_supervision=False, **kwargs):
         super().__init__()
 
